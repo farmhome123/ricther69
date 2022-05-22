@@ -1,0 +1,398 @@
+import 'dart:async';
+import 'dart:math' as math;
+import 'dart:convert' show utf8;
+import 'package:flutter/material.dart';
+import 'package:flutter_app_com/bluetooth/valueProvider.dart';
+import 'package:flutter_blue/flutter_blue.dart';
+import 'package:provider/src/provider.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+
+class DATALOG extends StatefulWidget {
+  final BluetoothCharacteristic? characteristicTX;
+  final BluetoothCharacteristic? characteristicRX;
+  const DATALOG(
+      {Key? key,
+      required this.characteristicTX,
+      required this.characteristicRX})
+      : super(key: key);
+
+  @override
+  _DATALOGState createState() => _DATALOGState();
+}
+
+class _DATALOGState extends State<DATALOG> {
+  TooltipBehavior? _tooltipBehavior;
+  ZoomPanBehavior? _zoomPanBehavior;
+
+  ChartSeriesController? _chartSeriesController1;
+  ChartSeriesController? _chartSeriesController2;
+  ChartSeriesController? _chartSeriesController3;
+
+  late List<_ChartData> chartData;
+  String? valueBle;
+  late int count;
+  Timer? timer;
+  bool isrunning = true;
+  bool showFRT = true;
+  bool showVFRP = true;
+  bool showSPEED = true;
+  int valueFRT = 0;
+  int valueVFRP = 0;
+  @override
+  void initState() {
+    chartData = getChartData();
+    count = 1;
+    getdataBle();
+    // timer =
+    //     Timer.periodic(const Duration(milliseconds: 100), _updateDataSource);
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+        child: Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+              image: AssetImage('assets/images/datalog-page/bg.jpg'),
+              fit: BoxFit.cover),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 10, right: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'FRP DATALOGGER',
+                    style: TextStyle(color: Colors.amber, fontSize: 30),
+                  ),
+                  Text(
+                    '${context.watch<valueProvider>().battery}  V',
+                    style: TextStyle(color: Colors.amber, fontSize: 30),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  height: 230,
+                  width: 200,
+                  child: Column(
+                    children: [
+                      TextButton(
+                          onPressed: () {},
+                          child: const Text(
+                            'EN/DIS',
+                            style: TextStyle(fontSize: 20),
+                          )),
+                      TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _updateDataSource;
+                              showFRT = !showFRT;
+                            });
+                          },
+                          child: const Text(
+                            'FRP',
+                            style: TextStyle(fontSize: 20),
+                          )),
+                      TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _updateDataSource;
+                              showVFRP = !showVFRP;
+                            });
+                          },
+                          child: const Text(
+                            'VFRP',
+                            style: TextStyle(fontSize: 20),
+                          )),
+                      TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _updateDataSource;
+                              showSPEED = !showSPEED;
+                            });
+                          },
+                          child: Text(
+                            'SPEED',
+                            style: TextStyle(fontSize: 20),
+                          )),
+                    ],
+                  ),
+                ),
+                Container(
+                  height: 240,
+                  width: 500,
+                  color: Colors.grey,
+                  child: SfCartesianChart(
+                    plotAreaBorderWidth: 0,
+                    primaryXAxis: NumericAxis(
+                      majorGridLines: const MajorGridLines(width: 0),
+                      autoScrollingDelta: 50,
+                    ),
+                    primaryYAxis: NumericAxis(
+                        axisLine: const AxisLine(width: 0),
+                        majorTickLines: const MajorTickLines(size: 0)),
+                    zoomPanBehavior: ZoomPanBehavior(
+                        enablePinching: true,
+                        zoomMode: ZoomMode.x,
+                        enablePanning: true),
+                    tooltipBehavior: TooltipBehavior(enable: true),
+                    series: _getDefaultLineSeries(),
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon:
+                          Image.asset('assets/images/datalog-page/bt-play.png'),
+                      iconSize: 50,
+                      onPressed: () {
+                        setState(() {
+                          isrunning == true;
+                        });
+                      },
+                    ),
+                    IconButton(
+                      icon:
+                          Image.asset('assets/images/datalog-page/bt-stop.png'),
+                      iconSize: 50,
+                      onPressed: () {
+                        isrunning == false;
+                      },
+                    ),
+                    IconButton(
+                      icon: Image.asset('assets/images/clear.png'),
+                      iconSize: 50,
+                      onPressed: () {
+                        setState(() {
+                          chartData.clear();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      ' Frp = ${context.watch<valueProvider>().frp}',
+                      style: TextStyle(color: Colors.yellow),
+                    ),
+                    Text(
+                      ' showFRT (${showFRT})',
+                      style: TextStyle(color: Colors.yellow),
+                    ),
+                    Text(
+                      ' showVFRP (${showVFRP})',
+                      style: TextStyle(color: Colors.yellow),
+                    ),
+                    Text(
+                      ' showSPEED (${showSPEED})',
+                      style: TextStyle(color: Colors.yellow),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 20),
+                      child: TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text(
+                            'EXIT',
+                            style: TextStyle(
+                                fontSize: 24, fontWeight: FontWeight.bold),
+                          )),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ));
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    chartData.clear();
+    _chartSeriesController1 = null;
+    _chartSeriesController2 = null;
+    _chartSeriesController3 = null;
+    super.dispose();
+  }
+
+  String _dataParser(List<int> dataFromDevice) {
+    return utf8.decode(dataFromDevice);
+  }
+
+  void getdataBle() {
+    if (widget.characteristicTX != null) {
+      widget.characteristicTX!.value.listen((data) {
+        final command = _dataParser(data).toString();
+        print('data  ========= > ${command}');
+        if (command.contains('frp1=')) {
+          final start = 'frp1=';
+          final end = '#';
+          final startIndex = command.indexOf(start);
+          final endIndex = command.indexOf(end);
+          final resultfrp1 =
+              command.substring(startIndex + start.length, endIndex).trim();
+          // context.read<valueProvider>().frp = double.parse(result);
+          valueFRT = int.parse(resultfrp1);
+          print('Data ------------> frp = ${valueFRT}');
+          // setState(() {
+          //   valueBle = resultfrp1;
+          // });
+          // _getChartData(result);
+          // _updateDataSource(resultfrp1);
+        } else if (command.contains('vfrp_')) {
+          final start = 'vfrp_=';
+          final end = '#';
+          final startIndex = command.indexOf(start);
+          final endIndex = command.indexOf(end);
+          final resultvfrp_ =
+              command.substring(startIndex + start.length, endIndex).trim();
+          // context.read<valueProvider>().frp = double.parse(result);
+          valueVFRP = int.parse(resultvfrp_);
+          print('Data ------------> vfrp = ${valueVFRP}');
+          // setState(() {
+          //   valueBle = resultfrp1;
+          // });
+          // _getChartData(result);
+          // _updateDataSource(resultfrp1);
+
+        }
+        if (isrunning == true) {
+          if (count <= 500) {
+            setState(() {
+              _updateDataSource();
+            });
+          }
+        }
+      });
+    }
+  }
+
+  void _updateDataSource() {
+    var provider = Provider.of<valueProvider>(context, listen: false);
+    var speed = provider.speed;
+    chartData.add(_ChartData(count, valueFRT, _getRandomInt(10, 240), speed));
+    if (count <= 500) {
+      if (chartData.length == 1) {
+        ///// line1 /////
+
+        chartData.removeAt(0);
+        _chartSeriesController1?.updateDataSource(
+          addedDataIndexes: <int>[chartData.length - 1],
+          removedDataIndexes: <int>[0],
+        );
+
+        ///// line2 /////
+
+        _chartSeriesController2?.updateDataSource(
+          addedDataIndexes: <int>[chartData.length - 1],
+          removedDataIndexes: <int>[0],
+        );
+
+        ///// line3 /////
+
+        _chartSeriesController3?.updateDataSource(
+          addedDataIndexes: <int>[chartData.length - 1],
+          removedDataIndexes: <int>[0],
+        );
+      } else {
+        ///// line1/////
+
+        _chartSeriesController1?.updateDataSource(
+          addedDataIndexes: <int>[chartData.length - 1],
+        );
+
+        ///// line2 /////
+
+        _chartSeriesController2?.updateDataSource(
+          addedDataIndexes: <int>[chartData.length - 1],
+        );
+
+        ///// line3 /////
+
+        _chartSeriesController3?.updateDataSource(
+          addedDataIndexes: <int>[chartData.length - 1],
+        );
+      }
+      count = count + 1;
+    }
+  }
+
+  List<LineSeries<_ChartData, int>> _getDefaultLineSeries() {
+    return <LineSeries<_ChartData, int>>[
+      LineSeries<_ChartData, int>(
+        name: 'FRT',
+        onRendererCreated: (ChartSeriesController controller) {
+          _chartSeriesController1 = controller;
+        },
+        dataSource: showFRT == true ? chartData : [],
+        color: Colors.red,
+        xValueMapper: (_ChartData sales, _) => sales.country,
+        yValueMapper: (_ChartData sales, _) => sales.sales1,
+        animationDuration: 0,
+      ),
+      LineSeries<_ChartData, int>(
+        name: 'VFRP',
+        onRendererCreated: (ChartSeriesController controller) {
+          _chartSeriesController2 = controller;
+        },
+        dataSource: showVFRP == true ? chartData : [],
+        color: Colors.blue,
+        xValueMapper: (_ChartData sales, _) => sales.country,
+        yValueMapper: (_ChartData sales, _) => sales.sales2,
+        animationDuration: 0,
+      ),
+      LineSeries<_ChartData, int>(
+        name: 'SPEED GPS',
+        onRendererCreated: (ChartSeriesController controller) {
+          _chartSeriesController3 = controller;
+        },
+        dataSource: showSPEED == true ? chartData : [],
+        color: Colors.yellow,
+        xValueMapper: (_ChartData sales, _) => sales.country,
+        yValueMapper: (_ChartData sales, _) => sales.sales3,
+        animationDuration: 0,
+      ),
+    ];
+  }
+
+  List<_ChartData> getChartData() {
+    return <_ChartData>[
+      _ChartData(0, 0, 10, 20),
+    ];
+  }
+
+  int _getRandomInt(int min, int max) {
+    final math.Random _random = math.Random();
+    return min + _random.nextInt(max - min);
+  }
+}
+
+class _ChartData {
+  _ChartData(this.country, this.sales1, this.sales2, this.sales3);
+  final int country;
+  final num sales1;
+  final num sales2;
+  final num sales3;
+}
